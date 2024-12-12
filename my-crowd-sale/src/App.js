@@ -140,7 +140,7 @@ function App() {
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             const signer = provider.getSigner();
             const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, signer);
-            const tx = await contract.sellToken(GREEN_TOKEN_ADDRESS, ethers.utils.parseEther(sellAmount));
+            const tx = await contract.sellToken(GREEN_TOKEN_ADDRESS, sellAmount);
             await tx.wait();
             console.log('Token sale successful');
         } catch (error) {
