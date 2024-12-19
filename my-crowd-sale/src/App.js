@@ -37,6 +37,23 @@ function App() {
     }
   };
 
+  // Format numbers to be more readable (e.g., 0.000000000000000002 → 2)
+  const formatNumber = (strNum) => {
+    const num = parseFloat(strNum);
+    if (num === 0) return "0";
+    if (num < 0.000001) return num.toExponential(2);
+    return num.toLocaleString(undefined, {
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 0,
+    });
+  };
+
+  // Truncate address for display
+  const truncateAddress = (address) => {
+    if (!address) return "";
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
   const checkOwnerStatus = async (address) => {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const contract = new ethers.Contract(
@@ -73,29 +90,32 @@ function App() {
   };
 
   const fetchCurrentSales = async () => {
-  try {
-    const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, provider);
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contract = new ethers.Contract(
+        CROWDSALE_ADDRESS,
+        crowdsaleABI,
+        provider
+      );
 
-    // Call viewTokenSelling from the contract
-    const sales = await contract.viewTokenSelling();
+      // Call viewTokenSelling from the contract
+      const sales = await contract.viewTokenSelling();
 
-    // Process sales to parse the returned data
-    const parsedSales = sales.map((sale, index) => ({
-      id: index + 1, // Sale ID starts from 1
-      seller: sale.seller,
-      tokenAddress: sale.tokenAddress,
-      amount: ethers.utils.formatUnits(sale.amount, 18), // Assuming token uses 18 decimals
-      price: ethers.utils.formatUnits(sale.pricePerToken, 18), // Assuming token uses 18 decimals
-    }));
+      // Process sales to parse the returned data
+      const parsedSales = sales.map((sale, index) => ({
+        id: index + 1, // Sale ID starts from 1
+        seller: sale.seller,
+        tokenAddress: sale.tokenAddress,
+        amount: ethers.utils.formatUnits(sale.amount, 18), // Assuming token uses 18 decimals
+        price: ethers.utils.formatUnits(sale.pricePerToken, 18), // Assuming token uses 18 decimals
+      }));
 
-    console.log("Fetched sales:", parsedSales);
-    setSaleInfo(parsedSales);
-  } catch (error) {
-    console.error("Error fetching sales info:", error);
-  }
-};
-
+      console.log("Fetched sales:", parsedSales);
+      setSaleInfo(parsedSales);
+    } catch (error) {
+      console.error("Error fetching sales info:", error);
+    }
+  };
 
   const fetchPurchaseHistory = async (address) => {
     try {
@@ -122,38 +142,47 @@ function App() {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const contract = new ethers.Contract(
-        CROWDSALE_ADDRESS,
-        crowdsaleABI,
-        signer
-      );
-
-      // Call the contract's buyToken function directly
+      const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, signer);
+  
+      // Get the sale details
+      const sale = saleInfo.find((sale) => sale.id === saleId);
+      const totalCost = ethers.utils.parseEther(sale.price).mul(sale.amount);
+  
+      // Fetch the ECO balance
+      const ecoToken = new ethers.Contract(ECO_TOKEN_ADDRESS, ecoTokenABI, provider);
+      const ecoBalance = await ecoToken.balanceOf(account);
+  
+      // Check balance
+      if (ethers.BigNumber.from(ecoBalance).lt(totalCost)) {
+        alert("Insufficient ECO balance to complete the purchase.");
+        return;
+      }
+  
+      // Proceed with purchase
       const tx = await contract.buyToken(saleId);
       await tx.wait();
-
-      console.log("Token purchase successful");
       alert("Purchase successful!");
-
+  
       // Refresh state
-      fetchBalances(account); // Refresh balances
-      fetchCurrentSales(); // Refresh sales
+      fetchBalances(account);
+      fetchCurrentSales();
     } catch (error) {
       console.error("Error buying token:", error);
-      alert("Failed to purchase tokens. Please check the console for details.");
+      alert("Purchase failed. Check the console for details.");
     }
   };
+  
 
-//   const approveTokens = async (amount, tokenAddress) => {
-//     const provider = new ethers.providers.Web3Provider(window.ethereum);
-//     const signer = provider.getSigner();
-//     const token = new ethers.Contract(tokenAddress, greenTokenABI, signer);
-//     const tx = await token.approve(
-//       CROWDSALE_ADDRESS,
-//       ethers.utils.parseEther(amount)
-//     );
-//     await tx.wait();
-//   };
+  //   const approveTokens = async (amount, tokenAddress) => {
+  //     const provider = new ethers.providers.Web3Provider(window.ethereum);
+  //     const signer = provider.getSigner();
+  //     const token = new ethers.Contract(tokenAddress, greenTokenABI, signer);
+  //     const tx = await token.approve(
+  //       CROWDSALE_ADDRESS,
+  //       ethers.utils.parseEther(amount)
+  //     );
+  //     await tx.wait();
+  //   };
 
   const setTokenPrice = async () => {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -212,20 +241,19 @@ function App() {
               <p>Eco Balance: {ecoBalance}</p>
             </div>
           </div>
-  
+
           <h2>Current Sales</h2>
           <ul>
             {saleInfo.map((sale) => (
               <li key={sale.id}>
-                Sale ID: {sale.id}, {sale.seller}, Rate: {sale.price}, Amount:{" "}
-                {sale.amount}
-                <button onClick={() => buyToken(sale.id, sale.amount)}>
-                  Buy
-                </button>
+                Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {sale.price},
+                Remaining: {sale.amount}, Total Cost:{" "}
+                {(sale.price * sale.amount).toFixed(2)} ECO
+                <button onClick={() => buyToken(sale.id)}>Buy</button>
               </li>
             ))}
           </ul>
-  
+
           {isOwner ? (
             <div className="owner-functions">
               <h2>Owner Functions</h2>
@@ -240,7 +268,7 @@ function App() {
                   Set Price
                 </button>
               </div>
-              
+
               <div className="input-group">
                 <input
                   type="text"
@@ -252,7 +280,7 @@ function App() {
                   Sell Tokens
                 </button>
               </div>
-              
+
               <div className="button-group">
                 <button className="btn btn-withdraw" onClick={withdrawTokens}>
                   Withdraw Tokens
