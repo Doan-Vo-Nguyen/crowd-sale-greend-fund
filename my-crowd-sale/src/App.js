@@ -177,16 +177,21 @@ function App() {
   };
   
 
-  //   const approveTokens = async (amount, tokenAddress) => {
-  //     const provider = new ethers.providers.Web3Provider(window.ethereum);
-  //     const signer = provider.getSigner();
-  //     const token = new ethers.Contract(tokenAddress, greenTokenABI, signer);
-  //     const tx = await token.approve(
-  //       CROWDSALE_ADDRESS,
-  //       ethers.utils.parseEther(amount)
-  //     );
-  //     await tx.wait();
-  //   };
+  const approveTokens = async (amount) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const ecoToken = new ethers.Contract(ECO_TOKEN_ADDRESS, ecoTokenABI, signer);
+  
+      const tx = await ecoToken.approve(CROWDSALE_ADDRESS, ethers.utils.parseEther(amount));
+      await tx.wait();
+      alert("Approval successful!");
+    } catch (error) {
+      console.error("Error approving tokens:", error);
+      alert("Failed to approve tokens.");
+    }
+  };
+  
 
   const setTokenPrice = async () => {
     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -248,6 +253,7 @@ function App() {
 
           <h2>Current Sales</h2>
           <ul>
+          <button onClick={() => approveTokens("50")}>Approve 50 ECO</button>
             {saleInfo.map((sale) => (
               <li key={sale.id}>
                 Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {sale.price},
