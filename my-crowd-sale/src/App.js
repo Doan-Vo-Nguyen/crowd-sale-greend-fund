@@ -146,7 +146,11 @@ function App() {
   
       // Get the sale details
       const sale = saleInfo.find((sale) => sale.id === saleId);
-      const totalCost = ethers.utils.parseEther(sale.price).mul(sale.amount);
+
+      // Convert price and amount to BigNumber in wei
+      const pricePerToken = ethers.utils.parseUnits(sale.price.toString(), 18); // Assuming 18 decimals
+      const amount = ethers.utils.parseUnits(sale.amount.toString(), 18); // Assuming token has 18 decimals
+      const totalCost = pricePerToken.mul(amount);
   
       // Fetch the ECO balance
       const ecoToken = new ethers.Contract(ECO_TOKEN_ADDRESS, ecoTokenABI, provider);
