@@ -94,39 +94,50 @@ function App() {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, provider);
   
-      const sales = await contract.viewTokenSelling();
+      // Get the total count of sales
       const count = await contract.countSale();
-  
-      // Check if there are sales
-      if (!sales || sales.length === 0) {
-        setSaleInfo([]);
-        return;
-      }
+      console.log("Total sales count:", count.toString());
   
       const parsedSales = [];
-      for (let i = 0; i < count; i++) {
-        const sale = sales[i];
-        if (sale.amount > 0) { // Only process sales with a positive amount
-            const totalCost = await contract.getCost(i + 3); // Pass the correct sale ID
-            parsedSales.push({
-              id: i + 1,
-              seller: sale.seller,
-              tokenAddress: sale.tokenAddress,
-              amount: ethers.utils.formatUnits(sale.amount, 18), // Assuming 18 decimals
-              price: ethers.utils.formatUnits(sale.pricePerToken, 18), // Assuming 18 decimals
-              totalCost: ethers.utils.formatEther(totalCost), // Convert cost from wei to ETH/ECO
-            });
+  
+      // Iterate through all sales and fetch details
+      for (let i = 1; i <= count.toNumber(); i++) {
+        try {
+          // Fetch sale information by ID
+          const sale = await contract.sales(i);
+  
+          // Skip inactive or invalid sales
+          if (sale.amount === "0") {
+            console.log(`Skipping sale #${i} - inactive or invalid`);
+            continue;
+          }
+  
+          // Get total cost for the sale
+          const totalCost = await contract.getCost(i);
+  
+          // Add valid sales to the parsed list
+          parsedSales.push({
+            id: i,
+            seller: sale.seller,
+            tokenAddress: sale.tokenAddress,
+            amount: ethers.utils.formatEther(sale.amount),
+            price: ethers.utils.formatEther(sale.pricePerToken),
+            totalCost: ethers.utils.formatEther(totalCost),
+          });
+        } catch (error) {
+          console.log(`Error processing sale #${i}:`, error.message);
+          continue;
         }
-        
       }
   
-      console.log("Fetched sales with total costs:", parsedSales);
-      console.log();
+      console.log("Final processed active sales:", parsedSales);
       setSaleInfo(parsedSales);
     } catch (error) {
       console.error("Error fetching sales info:", error);
+      setSaleInfo([]);
     }
   };
+  
   
 
   const fetchPurchaseHistory = async (address) => {
@@ -263,8 +274,8 @@ function App() {
           <button onClick={() => approveTokens("50")}>Approve 50 ECO</button>
             {saleInfo.map((sale) => (
               <li key={sale.id}>
-                Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {sale.price},
-                Value: {sale.amount}, Total Cost:{" "}
+                Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {formatNumber(sale.price)},
+                Value: {formatNumber(sale.amount)}, Total Cost:{" "}
                 {(sale.totalCost)} ECO
                 <button onClick={() => buyToken(sale.id)}>Buy</button>
               </li>
