@@ -7,7 +7,7 @@ import "./App.css";
 
 const GREEN_TOKEN_ADDRESS = "0xad0852764e45037e9feaa8af5d48029d2ab37365";
 const ECO_TOKEN_ADDRESS = "0x2a1094c204e6de85d02015e5cf1a618923851c24";
-const CROWDSALE_ADDRESS = "0x62bc27269533f7B6c1d1D947e34E59b46a5435A9";
+const CROWDSALE_ADDRESS = "0xaf42FF1B473D18a67e892A5120F15C903EFe501c";
 
 function App() {
   const [account, setAccount] = useState("");
@@ -92,30 +92,42 @@ function App() {
   const fetchCurrentSales = async () => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const contract = new ethers.Contract(
-        CROWDSALE_ADDRESS,
-        crowdsaleABI,
-        provider
-      );
-
-      // Call viewTokenSelling from the contract
+      const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, provider);
+  
       const sales = await contract.viewTokenSelling();
-
-      // Process sales to parse the returned data
-      const parsedSales = sales.map((sale, index) => ({
-        id: index + 1, // Sale ID starts from 1
-        seller: sale.seller,
-        tokenAddress: sale.tokenAddress,
-        amount: ethers.utils.formatUnits(sale.amount, 18), // Assuming token uses 18 decimals
-        price: ethers.utils.formatUnits(sale.pricePerToken, 18), // Assuming token uses 18 decimals
-      }));
-
-      console.log("Fetched sales:", parsedSales);
+      const count = await contract.countSale();
+  
+      // Check if there are sales
+      if (!sales || sales.length === 0) {
+        setSaleInfo([]);
+        return;
+      }
+  
+      const parsedSales = [];
+      for (let i = 0; i < count; i++) {
+        const sale = sales[i];
+        if (sale.amount > 0) { // Only process sales with a positive amount
+            const totalCost = await contract.getCost(i + 3); // Pass the correct sale ID
+            parsedSales.push({
+              id: i + 1,
+              seller: sale.seller,
+              tokenAddress: sale.tokenAddress,
+              amount: ethers.utils.formatUnits(sale.amount, 18), // Assuming 18 decimals
+              price: ethers.utils.formatUnits(sale.pricePerToken, 18), // Assuming 18 decimals
+              totalCost: ethers.utils.formatEther(totalCost), // Convert cost from wei to ETH/ECO
+            });
+        }
+        
+      }
+  
+      console.log("Fetched sales with total costs:", parsedSales);
+      console.log();
       setSaleInfo(parsedSales);
     } catch (error) {
       console.error("Error fetching sales info:", error);
     }
   };
+  
 
   const fetchPurchaseHistory = async (address) => {
     try {
@@ -144,13 +156,8 @@ function App() {
       const signer = provider.getSigner();
       const contract = new ethers.Contract(CROWDSALE_ADDRESS, crowdsaleABI, signer);
   
-      // Get the sale details
-      const sale = saleInfo.find((sale) => sale.id === saleId);
-
-      // Convert price and amount to BigNumber in wei
-      const pricePerToken = ethers.utils.parseUnits(sale.price.toString(), 18); // Assuming 18 decimals
-      const amount = ethers.utils.parseUnits(sale.amount.toString(), 18); // Assuming token has 18 decimals
-      const totalCost = pricePerToken.mul(amount);
+      // Get the cost from the contract
+      const totalCost = await contract.getCost(saleId);
   
       // Fetch the ECO balance
       const ecoToken = new ethers.Contract(ECO_TOKEN_ADDRESS, ecoTokenABI, provider);
@@ -257,8 +264,8 @@ function App() {
             {saleInfo.map((sale) => (
               <li key={sale.id}>
                 Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {sale.price},
-                Remaining: {sale.amount}, Total Cost:{" "}
-                {(sale.price * sale.amount).toFixed(2)} ECO
+                Value: {sale.amount}, Total Cost:{" "}
+                {(sale.totalCost)} ECO
                 <button onClick={() => buyToken(sale.id)}>Buy</button>
               </li>
             ))}
