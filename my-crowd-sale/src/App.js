@@ -275,7 +275,7 @@ function App() {
             {saleInfo.map((sale) => (
               <li key={sale.id}>
                 Sale ID: {sale.id}, Seller: {truncateAddress(sale.seller)}, Rate: {formatNumber(sale.price)},
-                Value: {formatNumber(sale.amount)}, Total Cost:{" "}
+                Value: {formatNumber(sale.amount)} GREEN, Total Cost:{" "}
                 {(sale.totalCost)} ECO
                 <button onClick={() => buyToken(sale.id)}>Buy</button>
               </li>
@@ -321,7 +321,7 @@ function App() {
               <ul>
                 {purchaseHistory.map((entry, index) => (
                   <li key={index}>
-                    Amount: {entry.amount}, Date: {entry.date}
+                    Amount: {entry.amount} GREEn, Date: {entry.date}
                   </li>
                 ))}
               </ul>
